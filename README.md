@@ -49,3 +49,12 @@ ln -sfn ~/Projects/hopper/hopper ~/.local/bin/hopper     # or any folder on your
 ```
 
 `hopper timer on` records the `PATH` of the shell it is run from: run it from a shell where `claude` is found.
+
+## Linux and macOS
+
+On Linux a sign-in is a file (`~/.claude/.credentials.json` in use, `<folder>/.credentials.json` kept). On macOS it is
+an item of the login keychain: « Claude Code-credentials » in use, and a sign-in made with `CLAUDE_CONFIG_DIR=<folder>`
+gets its own item, « Claude Code-credentials-<first 8 hex of sha256(folder)> ». `hopper` moves the one or the other;
+the commands are the same. On a Mac the first switch may show the system's keychain prompt once (« Always Allow »),
+and `hopper timer on` installs a launchd agent (`~/Library/LaunchAgents/io.hopper.auto.plist`, log in
+`~/Library/Logs/hopper.log`) instead of a systemd timer.
