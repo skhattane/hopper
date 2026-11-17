@@ -14,6 +14,7 @@ hopper list           the accounts here: in use / ready / needs its sign-in
 hopper to <name>      switch; checks the account really changed, puts everything back if not
 hopper auto           switch to the first account your pick command names that is usable here
 hopper timer on|off   run « auto » every minute by itself (a systemd user timer)
+hopper prefer <name>|none     try this account first, for as long as the pick command still lists it
 ```
 
 `auto` knows nothing about usage: it runs the one command line in `~/.config/hopper/pick`, which prints

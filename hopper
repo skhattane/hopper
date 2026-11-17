@@ -13,6 +13,7 @@
 #   hopper to <name>      switch; checks the account really changed, puts everything back if not
 #   hopper auto           switch to the first account your pick command names that is usable here
 #   hopper timer on|off   run « auto » every minute by itself (systemd user timer)
+#   hopper prefer <name>|none     try this account first, for as long as the pick command still lists it
 # Remote Control ends at every switch: type /remote-control in each session afterwards.
 set -u
 A=$HOME/.claude-accounts; C=$HOME/.config/hopper; LIVE=$HOME/.claude/.credentials.json
@@ -105,7 +106,11 @@ case "${1:-}" in
     cmd=$(head -1 "$C/pick" 2>/dev/null)
     [ -n "$cmd" ] || { echo "hopper: no pick command: write one line in $C/pick (a command that prints account names, best first)" >&2; exit 2; }
     cur=$(active); want=""
-    for n in $(sh -c "$cmd" 2>/dev/null | tr -d '\r' | head -8); do
+    names=$(sh -c "$cmd" 2>/dev/null | tr -d '\r' | head -8)
+    # A name you prefer for now (hopper prefer <name>) is tried first for as long as the pick command still lists it.
+    pref=$(head -1 "$C/prefer" 2>/dev/null)
+    if [ -n "$pref" ] && printf '%s\n' $names | grep -qx "$pref"; then names="$pref $names"; fi
+    for n in $names; do
       case "$n" in *[!a-z0-9-]*|"") continue;; esac
       if [ "$n" = "$cur" ] || { [ -f "$A/$n/.credentials.json" ] && [ "$(field "$A/$n" loggedIn)" = true ]; }; then want=$n; break; fi
     done
@@ -119,6 +124,12 @@ case "${1:-}" in
     fi
     [ "$want" != "$cur" ] || { echo "staying on $want"; exit 0; }
     exec "$0" to "$want" ;;
+  prefer) # prefer <name>|none — try this account first while the pick command still lists it (it is still usable)
+    case "${2:-}" in
+      "") echo "prefers: $(head -1 "$C/prefer" 2>/dev/null || true)" ;;
+      none) rm -f "$C/prefer"; echo "no preference: the pick command's own order" ;;
+      *) okname "$2"; printf '%s\n' "$2" >"$C/prefer"; echo "prefers $2 for as long as it is usable" ;;
+    esac ;;
   timer) # timer on|off|status — run « auto » every minute by itself (a systemd user timer; Linux)
     U=$HOME/.config/systemd/user; self=$(readlink -f "$0")
     case "${2:-status}" in
@@ -134,5 +145,5 @@ case "${1:-}" in
         journalctl --user -u hopper-auto.service -n 3 --no-pager -o cat 2>/dev/null ;;
       *) echo "hopper: timer on|off|status" >&2; exit 2 ;;
     esac ;;
-  *) sed -n '2,17p' "$0"; exit 2 ;;
+  *) sed -n '2,18p' "$0"; exit 2 ;;
 esac
