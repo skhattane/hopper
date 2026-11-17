@@ -77,30 +77,27 @@ case "${1:-}" in
     exec 9>"$C/lock"; flock -n 9 || { echo "hopper: another switch is running" >&2; exit 1; }
     src=$A/$want/.credentials.json
     [ -f "$src" ] && [ "$(field "$A/$want" loggedIn)" = true ] || { echo "hopper: $want has no sign-in here (hopper add $want)" >&2; exit 1; }
-    who_want=$(field "$A/$want" email); who_cur=$(field "" email)
-    [ -n "$who_want" ] && [ "$who_want" != "$who_cur" ] || { echo "hopper: $want's folder holds the account already in use; nothing moved" >&2; exit 1; }
+    # The sign-in file is what decides the account; the profile block is what the status line shows. The move is
+    # proven on the sign-in file itself (the bytes put in place are the wanted account's), never on the profile:
+    # running sessions rewrite the profile file from their own memory, so it can lag behind for a while.
+    cmp -s "$src" "$LIVE" && { echo "hopper: $want's sign-in is already the one in place; nothing moved" >&2; printf '%s\n' "$want" >"$C/active"; exit 0; }
     mkdir -p "$A/$cur"; chmod 700 "$A/$cur"
-    # The account's profile (who it is: the block the status command reads) moves with its sign-in. Without it
-    # the machine holds one account's sign-in under the other's name, and the check below cannot tell.
-    profile save "$CONF" "$A/$cur/profile.json" || { echo "hopper: could not keep $cur's profile; nothing changed" >&2; exit 1; }
-    if [ ! -f "$A/$want/profile.json" ]; then
-      profile save "$A/$want/.claude.json" "$A/$want/profile.json" || { echo "hopper: $want has no profile here; sign it in again (hopper add $want)" >&2; exit 1; }
-    fi
+    profile save "$CONF" "$A/$cur/profile.json" 2>/dev/null || true
+    if [ ! -f "$A/$want/profile.json" ]; then profile save "$A/$want/.claude.json" "$A/$want/profile.json" 2>/dev/null || true; fi
     cp -p "$LIVE" "$A/$cur/.credentials.json.tmp" && mv "$A/$cur/.credentials.json.tmp" "$A/$cur/.credentials.json" || { echo "hopper: could not keep $cur's sign-in; nothing changed" >&2; exit 1; }
     cp -p "$src" "$LIVE.tmp" && mv "$LIVE.tmp" "$LIVE" || { echo "hopper: could not put $want's sign-in in place; nothing changed" >&2; rm -f "$A/$cur/.credentials.json"; exit 1; }
-    profile put "$A/$want/profile.json" "$CONF"; put=$?
-    sleep 3
-    if [ "$put" = 0 ] && [ "$(field "" email)" = "$who_want" ]; then
+    if cmp -s "$src" "$LIVE"; then
       rm -f "$src"; printf '%s\n' "$want" >"$C/active"
       printf '%s %s -> %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$cur" "$want" >>"$C/switches.log"
-      echo "switched: $cur -> $want. A remote-control connection ended: start it again in each session."
+      if [ -f "$A/$want/profile.json" ] && profile put "$A/$want/profile.json" "$CONF" 2>/dev/null; then note=""
+      else note=" (the status line may still name $cur for a while: a running session rewrote the profile; the sign-in in place is $want's)"; fi
+      echo "switched: $cur -> $want.$note A remote-control connection ended: start it again in each session."
       # Tell whoever must know (~/.config/hopper/switched: a command line that receives « from » and « to »).
       sw=$(head -1 "$C/switched" 2>/dev/null)
       if [ -n "$sw" ]; then sh -c "$sw \"\$1\" \"\$2\"" switched "$cur" "$want" >/dev/null 2>"$C/switched.err" || echo "hopper: the « switched » command failed (see $C/switched.err)" >&2; fi
     else
       cp -p "$A/$cur/.credentials.json" "$LIVE.tmp" && mv "$LIVE.tmp" "$LIVE"; rm -f "$A/$cur/.credentials.json"
-      profile put "$A/$cur/profile.json" "$CONF"
-      echo "hopper: the account did not change; $cur put back" >&2; exit 1
+      echo "hopper: the sign-in in place is not $want's (another process rewrote it during the move); $cur put back" >&2; exit 1
     fi ;;
   auto) # follow the pick command (~/.config/hopper/pick): the first name it prints that is usable here
     cmd=$(head -1 "$C/pick" 2>/dev/null)
