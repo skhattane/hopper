@@ -104,7 +104,7 @@ case "${1:-}" in
     echo "folder ready. Sign this account in ONCE, in a browser, with:"
     echo "  CLAUDE_CONFIG_DIR=$A/$2 claude auth login" ;;
   list)
-    for d in "$A"/*/; do n=$(basename "$d")
+    for d in "$A"/*/; do [ -d "$d" ] || { echo "no account yet: hopper adopt <name>, then hopper add <name>"; break; }; n=$(basename "$d")
       if [ "$n" = "$(active)" ]; then s="in use"
       elif store_has "$n" && [ "$(field "${d%/}" loggedIn)" = true ]; then s="ready"
       else s="needs its sign-in (hopper add $n)"; fi
