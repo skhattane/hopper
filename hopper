@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# hopper — change the Claude account this machine's running sessions use, without restarting them.
+#
+# Proven 2026-11-15: a session keeps its conversation when the machine's sign-in changes under it. So each
+# account's sign-in is kept in its own folder while it is not in use, and a switch MOVES sign-ins:
+#   the one in use  → back into its folder          the one wanted → into ~/.claude
+# A sign-in is never in two places (two copies would each renew it and sign the other out). No content of a
+# sign-in file is ever printed. The account's profile block (who it is) moves with it. Linux only (on macOS the sign-in lives in the Keychain).
+#
+#   hopper adopt <name>   say which account is in use now (once, at setup)
+#   hopper add <name>     make the folder of another account, and print its one-time browser sign-in
+#   hopper list           the accounts here: in use / ready / needs its sign-in
+#   hopper to <name>      switch; checks the account really changed, puts everything back if not
+#   hopper auto           switch to the first account your pick command names that is usable here
+#   hopper timer on|off   run « auto » every minute by itself (systemd user timer)
+# Remote Control ends at every switch: type /remote-control in each session afterwards.
+set -u
+A=$HOME/.claude-accounts; C=$HOME/.config/hopper; LIVE=$HOME/.claude/.credentials.json
+CONF=$HOME/.claude.json
+# profile save <config file> <profile file>   keep that file's account block (who the account is; no sign-in)
+# profile put  <profile file> <config file>   set the config file's account block from a kept one; checked after
+#                                             writing, three tries (a running session may rewrite the file)
+profile() {
+  python3 - "$@" <<'PY'
+import json, os, sys, tempfile, time
+op, a, b = sys.argv[1], sys.argv[2], sys.argv[3]
+def write(path, obj):
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".hopper.")
+    with os.fdopen(fd, "w") as f:
+        json.dump(obj, f, indent=2)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+if op == "save":
+    block = json.load(open(a)).get("oauthAccount")
+    if not block:
+        sys.exit(1)
+    write(b, block)
+elif op == "put":
+    block = json.load(open(a))
+    for _ in range(3):
+        conf = json.load(open(b))
+        conf["oauthAccount"] = block
+        write(b, conf)
+        time.sleep(0.3)
+        if json.load(open(b)).get("oauthAccount") == block:
+            sys.exit(0)
+    sys.exit(1)
+else:
+    sys.exit(2)
+PY
+}
+mkdir -p "$A" "$C"; chmod 700 "$A"
+field() { # <config dir or ""> <json field>
+  if [ -n "$1" ]; then CLAUDE_CONFIG_DIR="$1" claude auth status 2>/dev/null; else claude auth status 2>/dev/null; fi |
+    sed -n "s/.*\"$2\": *\"\{0,1\}\([^\",]*\)\"\{0,1\}.*/\1/p" | head -1
+}
+okname() { case "$1" in *[!a-z0-9-]*|"") echo "hopper: a name is lowercase letters, digits, dashes" >&2; exit 2;; esac; }
+active() { cat "$C/active" 2>/dev/null; }
+case "${1:-}" in
+  adopt) okname "${2:-}"; [ "$(field "" loggedIn)" = true ] || { echo "hopper: this machine is not signed in" >&2; exit 1; }
+    mkdir -p "$A/$2"; chmod 700 "$A/$2"; printf '%s\n' "$2" >"$C/active"; echo "in use now: $2" ;;
+  add) okname "${2:-}"; mkdir -p "$A/$2"; chmod 700 "$A/$2"
+    echo "folder ready. Sign this account in ONCE, in a browser, with:"
+    echo "  CLAUDE_CONFIG_DIR=$A/$2 claude auth login" ;;
+  list)
+    for d in "$A"/*/; do n=$(basename "$d")
+      if [ "$n" = "$(active)" ]; then s="in use"
+      elif [ -f "$d/.credentials.json" ] && [ "$(field "$d" loggedIn)" = true ]; then s="ready"
+      else s="needs its sign-in (hopper add $n)"; fi
+      printf '%-10s %s\n' "$n" "$s"
+    done ;;
+  to) okname "${2:-}"; want=$2; cur=$(active)
+    [ -n "$cur" ] || { echo "hopper: say first which account is in use (hopper adopt <name>)" >&2; exit 1; }
+    [ "$want" != "$cur" ] || { echo "already on $want"; exit 0; }
+    exec 9>"$C/lock"; flock -n 9 || { echo "hopper: another switch is running" >&2; exit 1; }
+    src=$A/$want/.credentials.json
+    [ -f "$src" ] && [ "$(field "$A/$want" loggedIn)" = true ] || { echo "hopper: $want has no sign-in here (hopper add $want)" >&2; exit 1; }
+    who_want=$(field "$A/$want" email); who_cur=$(field "" email)
+    [ -n "$who_want" ] && [ "$who_want" != "$who_cur" ] || { echo "hopper: $want's folder holds the account already in use; nothing moved" >&2; exit 1; }
+    mkdir -p "$A/$cur"; chmod 700 "$A/$cur"
+    # The account's profile (who it is: the block the status command reads) moves with its sign-in. Without it
+    # the machine holds one account's sign-in under the other's name, and the check below cannot tell.
+    profile save "$CONF" "$A/$cur/profile.json" || { echo "hopper: could not keep $cur's profile; nothing changed" >&2; exit 1; }
+    if [ ! -f "$A/$want/profile.json" ]; then
+      profile save "$A/$want/.claude.json" "$A/$want/profile.json" || { echo "hopper: $want has no profile here; sign it in again (hopper add $want)" >&2; exit 1; }
+    fi
+    cp -p "$LIVE" "$A/$cur/.credentials.json.tmp" && mv "$A/$cur/.credentials.json.tmp" "$A/$cur/.credentials.json" || { echo "hopper: could not keep $cur's sign-in; nothing changed" >&2; exit 1; }
+    cp -p "$src" "$LIVE.tmp" && mv "$LIVE.tmp" "$LIVE" || { echo "hopper: could not put $want's sign-in in place; nothing changed" >&2; rm -f "$A/$cur/.credentials.json"; exit 1; }
+    profile put "$A/$want/profile.json" "$CONF"; put=$?
+    sleep 3
+    if [ "$put" = 0 ] && [ "$(field "" email)" = "$who_want" ]; then
+      rm -f "$src"; printf '%s\n' "$want" >"$C/active"
+      printf '%s %s -> %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$cur" "$want" >>"$C/switches.log"
+      echo "switched: $cur -> $want. A remote-control connection ended: start it again in each session."
+      # Tell whoever must know (~/.config/hopper/switched: a command line that receives « from » and « to »).
+      sw=$(head -1 "$C/switched" 2>/dev/null)
+      if [ -n "$sw" ]; then sh -c "$sw \"\$1\" \"\$2\"" switched "$cur" "$want" >/dev/null 2>"$C/switched.err" || echo "hopper: the « switched » command failed (see $C/switched.err)" >&2; fi
+    else
+      cp -p "$A/$cur/.credentials.json" "$LIVE.tmp" && mv "$LIVE.tmp" "$LIVE"; rm -f "$A/$cur/.credentials.json"
+      profile put "$A/$cur/profile.json" "$CONF"
+      echo "hopper: the account did not change; $cur put back" >&2; exit 1
+    fi ;;
+  auto) # follow the pick command (~/.config/hopper/pick): the first name it prints that is usable here
+    cmd=$(head -1 "$C/pick" 2>/dev/null)
+    [ -n "$cmd" ] || { echo "hopper: no pick command: write one line in $C/pick (a command that prints account names, best first)" >&2; exit 2; }
+    cur=$(active); want=""
+    for n in $(sh -c "$cmd" 2>/dev/null | tr -d '\r' | head -8); do
+      case "$n" in *[!a-z0-9-]*|"") continue;; esac
+      if [ "$n" = "$cur" ] || { [ -f "$A/$n/.credentials.json" ] && [ "$(field "$A/$n" loggedIn)" = true ]; }; then want=$n; break; fi
+    done
+    [ -n "$want" ] || { echo "the pick command named no account usable here; staying on $cur"; exit 0; }
+    # Tell others, if this machine is the one that announces (~/.config/hopper/announce: a command line
+    # that receives the name as its last argument). Only when the name changed since the last announcement.
+    ann=$(head -1 "$C/announce" 2>/dev/null)
+    if [ -n "$ann" ] && [ "$want" != "$(cat "$C/announced" 2>/dev/null)" ]; then
+      if sh -c "$ann \"\$1\"" announce "$want" >/dev/null 2>"$C/announce.err"; then printf '%s\n' "$want" >"$C/announced"
+      else echo "hopper: could not announce $want (see $C/announce.err); it will be tried again" >&2; fi
+    fi
+    [ "$want" != "$cur" ] || { echo "staying on $want"; exit 0; }
+    exec "$0" to "$want" ;;
+  timer) # timer on|off|status — run « auto » every minute by itself (a systemd user timer; Linux)
+    U=$HOME/.config/systemd/user; self=$(readlink -f "$0")
+    case "${2:-status}" in
+      on) command -v systemctl >/dev/null || { echo "hopper: no systemd here; run « hopper auto » from your own scheduler" >&2; exit 1; }
+        [ -s "$C/pick" ] || { echo "hopper: write the pick command first (one line in $C/pick)" >&2; exit 2; }
+        mkdir -p "$U"
+        printf '[Unit]\nDescription=hopper: follow the pick command, switch if it differs\n\n[Service]\nType=oneshot\nEnvironment=PATH=%s/.local/bin:/usr/local/bin:/usr/bin:/bin\nExecStart=%s auto\n' "$HOME" "$self" >"$U/hopper-auto.service"
+        printf '[Unit]\nDescription=hopper: every minute\n\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec=1min\nAccuracySec=30s\n\n[Install]\nWantedBy=timers.target\n' >"$U/hopper-auto.timer"
+        systemctl --user daemon-reload && systemctl --user enable --now hopper-auto.timer >/dev/null 2>&1 && systemctl --user start hopper-auto.service
+        echo "on: « auto » runs every minute (hopper timer status)" ;;
+      off) systemctl --user disable --now hopper-auto.timer >/dev/null 2>&1; echo "off" ;;
+      status) systemctl --user is-active hopper-auto.timer 2>/dev/null || true
+        journalctl --user -u hopper-auto.service -n 3 --no-pager -o cat 2>/dev/null ;;
+      *) echo "hopper: timer on|off|status" >&2; exit 2 ;;
+    esac ;;
+  *) sed -n '2,17p' "$0"; exit 2 ;;
+esac
