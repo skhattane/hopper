@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="hopper: three accounts in a row, and a hop from the spent one to the next">
+  <title>hopper</title>
+  <rect width="512" height="512" rx="112" fill="#0f172a"/>
+  <!-- a thin edge, so the tile stays visible on a dark page -->
+  <rect x="4" y="4" width="504" height="504" rx="108" fill="none" stroke="#475569" stroke-width="8"/>
+  <g transform="translate(256 262) scale(1.22) translate(-256 -246)">
+    <!-- the row the accounts sit on -->
+    <path d="M 126 316 H 386" fill="none" stroke="#334155" stroke-width="16" stroke-linecap="round"/>
+    <!-- the next hop, not taken yet -->
+    <path d="M 256 266 Q 321 150 386 266" fill="none" stroke="#475569" stroke-width="10" stroke-linecap="round" stroke-dasharray="1 24"/>
+    <!-- the hop: from the spent account to the next one -->
+    <path d="M 126 266 Q 191 90 256 266" fill="none" stroke="#f59e0b" stroke-width="16" stroke-linecap="round"/>
+    <!-- the accounts: spent, in use, ready -->
+    <circle cx="126" cy="316" r="34" fill="#0f172a" stroke="#64748b" stroke-width="12"/>
+    <circle cx="256" cy="316" r="34" fill="#f8fafc"/>
+    <circle cx="386" cy="316" r="34" fill="#0f172a" stroke="#f8fafc" stroke-width="12"/>
+    <!-- the sessions, about to land -->
+    <circle cx="223.5" cy="200" r="20" fill="#f59e0b"/>
+  </g>
+</svg>

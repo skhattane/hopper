@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/hopper-banner.svg" alt="hopper — change the account your running sessions use, without restarting them" width="100%">
+</p>
+
 # hopper
 
 Change which Claude account a machine's running sessions use, without restarting them.

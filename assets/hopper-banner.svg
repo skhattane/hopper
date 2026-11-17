@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img" aria-label="hopper — change the account your running sessions use, without restarting them">
+  <title>hopper — change the account your running sessions use, without restarting them</title>
+  <defs>
+    <linearGradient id="hopper-ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="24" fill="url(#hopper-ground)"/>
+  <rect x="1.5" y="1.5" width="1277" height="317" rx="22.5" fill="none" stroke="#475569" stroke-width="3"/>
+
+  <!-- four accounts in a row; the sessions hop from each spent one to the next -->
+  <path d="M 850 206 H 1200" fill="none" stroke="#334155" stroke-width="6" stroke-linecap="round"/>
+  <path d="M 850 186 Q 908 106 967 186" fill="none" stroke="#f59e0b" stroke-opacity="0.35" stroke-width="6" stroke-linecap="round"/>
+  <path d="M 967 186 Q 1025 86 1083 186" fill="none" stroke="#f59e0b" stroke-width="6" stroke-linecap="round"/>
+  <path d="M 1083 186 Q 1141 116 1200 186" fill="none" stroke="#475569" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 12"/>
+  <g fill="#0f172a" stroke="#64748b" stroke-width="5">
+    <circle cx="850" cy="206" r="14"/>
+    <circle cx="967" cy="206" r="14"/>
+  </g>
+  <circle cx="1083" cy="206" r="14" fill="#f8fafc"/>
+  <circle cx="1200" cy="206" r="14" fill="#0f172a" stroke="#f8fafc" stroke-width="5"/>
+  <!-- the sessions, about to land -->
+  <circle cx="1054" cy="148.5" r="10" fill="#f59e0b"/>
+
+  <!-- the mark -->
+  <g transform="translate(144 163) scale(0.36) translate(-256 -246)">
+    <path d="M 126 316 H 386" fill="none" stroke="#475569" stroke-width="18" stroke-linecap="round"/>
+    <path d="M 256 266 Q 321 150 386 266" fill="none" stroke="#475569" stroke-width="12" stroke-linecap="round" stroke-dasharray="1 26"/>
+    <path d="M 126 266 Q 191 90 256 266" fill="none" stroke="#f59e0b" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="126" cy="316" r="34" fill="#0f172a" stroke="#64748b" stroke-width="14"/>
+    <circle cx="256" cy="316" r="34" fill="#f8fafc"/>
+    <circle cx="386" cy="316" r="34" fill="#0f172a" stroke="#f8fafc" stroke-width="14"/>
+    <circle cx="223.5" cy="200" r="22" fill="#f59e0b"/>
+  </g>
+
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="240" y="158" font-size="76" font-weight="700" letter-spacing="-1.5" fill="#f8fafc">hopper</text>
+    <text x="243" y="204" font-size="24" fill="#cbd5e1">Change the account your running sessions use,</text>
+    <text x="243" y="236" font-size="24" fill="#cbd5e1">without restarting them.</text>
+  </g>
+</svg>
