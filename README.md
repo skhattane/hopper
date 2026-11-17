@@ -39,3 +39,12 @@ The names must be the same on every machine (they are yours: `work`, `home`, …
 
 After a switch, the one command line in `~/.config/hopper/switched` is run with the old and the new name
 (for instance to tell running sessions to take up what a spent account interrupted).
+
+## Install
+
+```
+git clone https://github.com/skhattane/hopper.git ~/Projects/hopper
+ln -sfn ~/Projects/hopper/hopper ~/.local/bin/hopper     # or any folder on your PATH
+```
+
+`hopper timer on` records the `PATH` of the shell it is run from: run it from a shell where `claude` is found.
