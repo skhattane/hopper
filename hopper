@@ -125,7 +125,7 @@ case "${1:-}" in
       on) command -v systemctl >/dev/null || { echo "hopper: no systemd here; run « hopper auto » from your own scheduler" >&2; exit 1; }
         [ -s "$C/pick" ] || { echo "hopper: write the pick command first (one line in $C/pick)" >&2; exit 2; }
         mkdir -p "$U"
-        printf '[Unit]\nDescription=hopper: follow the pick command, switch if it differs\n\n[Service]\nType=oneshot\nEnvironment=PATH=%s/.local/bin:/usr/local/bin:/usr/bin:/bin\nExecStart=%s auto\n' "$HOME" "$self" >"$U/hopper-auto.service"
+        printf '[Unit]\nDescription=hopper: follow the pick command, switch if it differs\n\n[Service]\nType=oneshot\nEnvironment=PATH=%s\nExecStart=%s auto\n' "$HOME/.local/bin:$PATH" "$self" >"$U/hopper-auto.service"
         printf '[Unit]\nDescription=hopper: every minute\n\n[Timer]\nOnBootSec=2min\nOnUnitActiveSec=1min\nAccuracySec=30s\n\n[Install]\nWantedBy=timers.target\n' >"$U/hopper-auto.timer"
         systemctl --user daemon-reload && systemctl --user enable --now hopper-auto.timer >/dev/null 2>&1 && systemctl --user start hopper-auto.service
         echo "on: « auto » runs every minute (hopper timer status)" ;;
